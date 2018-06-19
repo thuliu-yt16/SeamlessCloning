@@ -1,0 +1,101 @@
+<html>
+<body>
+
+<canvas id="canvasOne" class="myCanvas" width="1000" height="1000" style="background: rgb(240,240,240)"></canvas>
+<input  id="fileOne" type="file" />
+<textarea id="result" name="txt" cols="50" rows="5" warp="virtual"></textarea>
+
+<style>
+body {
+	padding-top: 0;
+	padding-left: 0;
+	margin-top: 0;
+	margin-left: 0;
+}
+
+#result {
+	width: 300px;
+	height: 300px;
+	wrap: hard;
+}
+</style>
+
+<script>
+	var pos = new Array();
+	var finish = 0;
+	function mouseDown(e)
+	{
+		if (finish == 1) return;
+		var mousePos = mouseCoords(e);
+		if (mousePos.x <= 1000 && mousePos.y <= 1000) {
+			if (pos.length > 0) {
+				var x = pos[pos.length - 2];
+				var y = pos[pos.length - 1];
+				var c = document.getElementById("canvasOne");
+				var cxt = c.getContext("2d");
+				if (Math.abs(mousePos.x - pos[0]) < 10 && Math.abs(mousePos.y - pos[1]) < 10) {
+					finish = 1;
+					cxt.moveTo(x, y);
+					cxt.lineTo(pos[0], pos[1]);
+					cxt.stroke();
+				}
+				else {
+					cxt.moveTo(x, y);
+					cxt.lineTo(mousePos.x, mousePos.y);
+					cxt.stroke();
+					pos.push(mousePos.x);
+					pos.push(mousePos.y);
+				}
+			}
+			else {
+				pos.push(mousePos.x);
+				pos.push(mousePos.y);
+			}
+			var s = "";
+			s = (pos.length / 2).toString();
+			s += "\n";
+			for(var i = 0; i < pos.length / 2; i++) {
+				s += pos[i * 2].toString() + " " + pos[i * 2 + 1].toString() + "\n";
+			}
+			document.getElementById("result").value = s;
+		}
+	}
+	function mouseCoords(e)
+	{
+		if (e.pageX || e.pageY) {
+			return {
+				x: e.pageX,
+				y: e.pageY
+			};
+		}
+		return {
+			x:e.clientX + document.body.scrollLeft - document.body.clientLeft,
+			y:e.clientY + document.body.scrollTop - document.body.clientTop
+		};
+	}
+	document.onmousedown = mouseDown;
+
+	var inputOne = document.getElementById('fileOne');
+	inputOne.onchange = function () {
+		var fileList = inputOne.files;
+		var file = fileList[0];
+		var reader = new FileReader();
+		reader.readAsDataURL(file);
+		reader.onload = function (e) {
+			showCanvas(reader.result);
+		}
+	}
+	function showCanvas(dataUrl) {
+		console.info(dataUrl);
+		var canvas = document.getElementById('canvasOne');
+		var ctx = canvas.getContext('2d');
+		var img = new Image();
+		img.onload = function () {
+			ctx.drawImage(img, 0, 0, img.width, img.height);
+		}
+		img.src = dataUrl;
+	}
+</script>
+
+</body>
+</html>
