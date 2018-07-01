@@ -16,8 +16,6 @@ void CalculateMeanValueCoordinate(const Point_2& p, double* lambda, const vector
 
 void MVCClone(const Image& src, Image& tgt, int offsetx, int offsety,const vector<Point_2>& v);
 
-void Triangulation(const vector<Point_2>& v, CDT& cdt);
-
 void CreateMesh(CDT& cdt);
 
 Face_handle LocationQuery(const Point_2& p, CDT& cdt);
@@ -26,4 +24,5 @@ void GetVertices(CDT& cdt, vector<Point_2>& vs);
 
 void MVCCloneWithMesh(const Image& src, Image& tgt, int offsetx, int offsety, const vector<Point_2>& v);
 
+Vector3 GetWeight(const Point_2& p, const vector<Point_2>& vertex);
 #endif

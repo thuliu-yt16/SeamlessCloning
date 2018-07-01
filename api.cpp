@@ -7,7 +7,11 @@ double dis(const Point_2& v1, const Point_2& v2){
 }
 double tan_2(double a,double b, double c){
     double s = (a + b + c) * 0.5;
-    return sqrt((s - b) * (s - c) / s / (s - a));
+    if(abs(s - a) < 1e-4){
+        return 1e20;
+    }
+    else
+        return sqrt((s - b) * (s - c) / s / (s - a));
 }
 
 void PlainCopy(const Image& src, Image& tgt, int offsetx, int offsety, const vector<Point_2>& v){
@@ -15,7 +19,7 @@ void PlainCopy(const Image& src, Image& tgt, int offsetx, int offsety, const vec
         for(int j = 0; j < src.h; j ++){
             Point_2 p(i, j);
             if(check(p, v) == CGAL::ON_BOUNDED_SIDE)
-                tgt.drawPixel(offsetx + i, offsety + j, src.getPixel(i,j));
+            tgt.drawPixel(offsetx + i, offsety + j, src.getPixel(i,j));
         }
     }
 }
@@ -36,27 +40,36 @@ void ReadVertex(const string& filename, vector<Point_2>& v){
 void CalculateMeanValueCoordinate(const Point_2& p, double* lambda, const vector<Point_2>& v){
     int vsize = v.size();
     double* l = new double[vsize]; // length of pi - x;
-    double* t = new double[vsize]; // tan(1/2 * L pi x pi+1)
-    double* w = new double[vsize]; // wi = tan(1/2 * ai-1) + tan( 1/2 * ai) / pi - x
-    double totw = 0.0;
+    int loc = -1;
     for(int i = 0; i < vsize; i ++){
         l[i] = dis(p,v[i]);
+        if(l[i] < 1e-4) {loc = i; break;}
     }
-    for(int i = 0; i < vsize - 1; i ++){
-        t[i] = tan_2(dis(v[i + 1], v[i]), l[i + 1], l[i]);
+    if(loc >= 0){
+        for(int i = 0; i < vsize; i ++)
+            lambda[i] = 0;
+        lambda[loc] = 1;
     }
-    t[vsize - 1] = tan_2(dis(v[0],v[vsize - 1]), l[0], l[vsize - 1]);
-    for(int i = 1; i < vsize; i ++){
-        totw += w[i] = (t[i - 1] + t[i]) / l[i];
-    }
-    totw += w[0] = (t[vsize - 1] + t[0]) / l[0];
-    totw = 1.0 / totw;
-    for(int i = 0; i < vsize; i ++){
-        lambda[i] = w[i] * totw;
+    else{
+        double* t = new double[vsize]; // tan(1/2 * L pi x pi+1)
+        double* w = new double[vsize]; // wi = tan(1/2 * ai-1) + tan( 1/2 * ai) / pi - x
+        double totw = 0.0;
+        delete[] t;
+        delete[] w;
+        for(int i = 0; i < vsize - 1; i ++){
+            t[i] = tan_2(dis(v[i + 1], v[i]), l[i + 1], l[i]);
+        }
+        t[vsize - 1] = tan_2(dis(v[0],v[vsize - 1]), l[0], l[vsize - 1]);
+        for(int i = 1; i < vsize; i ++){
+            totw += w[i] = (t[i - 1] + t[i]) / l[i];
+        }
+        totw += w[0] = (t[vsize - 1] + t[0]) / l[0];
+        totw = 1.0 / totw;
+        for(int i = 0; i < vsize; i ++){
+            lambda[i] = w[i] * totw;
+        }
     }
     delete[] l;
-    delete[] t;
-    delete[] w;
 }
 void MVCClone(const Image& src, Image& tgt, int offsetx, int offsety,const vector<Point_2>& v){
     int vsize = v.size();
@@ -86,14 +99,10 @@ void MVCClone(const Image& src, Image& tgt, int offsetx, int offsety,const vecto
     delete[] diff;
     for(int i = 0; i < sw; i ++){
         for(int j = 0; j < sh; j ++)
-            delete[] lam[i][j];
+        delete[] lam[i][j];
         delete[] lam[i];
     }
     delete[] lam;
-}
-void Triangulation(const vector<Point_2>& v, CDT& cdt){
-
-    //TODO
 }
 
 void CreateMesh(CDT& cdt, const vector<Point_2>& v){
@@ -136,9 +145,28 @@ void ShowMesh(Image img, const CDT& cdt){
         img.drawLine(p1.x(),p1.y(), p2.x(), p2.y(),Color(255,0,0),1);
     }
     img.show("mesh");
-    img.save("mesh.jpg");
+    img.save("../res/mesh1.jpg");
 }
 
+Vector3 GetWeight(const Point_2& sp, const vector<Point_2>& vertex){
+    float bax = vertex[1].x() - vertex[0].x();
+    float bay = vertex[1].y() - vertex[0].y();
+    float cax = vertex[2].x() - vertex[0].x();
+    float cay = vertex[2].y() - vertex[0].y();
+    float s = abs(bax * cay - cax * bay);
+    float pax = sp.x() - vertex[0].x();
+    float pay = sp.y() - vertex[0].y();
+    float pbx = sp.x() - vertex[1].x();
+    float pby = sp.y() - vertex[1].y();
+    float pcx = sp.x() - vertex[2].x();
+    float pcy = sp.y() - vertex[2].y();
+    float sa = abs(pbx * pcy - pcx * pby);
+    float sb = abs(pax * pcy - pcx * pay);
+
+    float u = sa / s;
+    float v = sb / s;
+    return Vector3(u, v, 1 - u - v);
+}
 void MVCCloneWithMesh(const Image& src, Image& tgt, int offsetx, int offsety, const vector<Point_2>& v){
     int vsize = v.size();
     int sw = src.w;
@@ -181,7 +209,10 @@ void MVCCloneWithMesh(const Image& src, Image& tgt, int offsetx, int offsety, co
                 Face_handle fh = LocationQuery(p, cdt);
                 vector<Point_2> fp;
                 ConvertToPoint_2(fh, fp);
-                Color c = 0.33333 * (r[(int)fp[0].x()][(int)fp[0].y()] + r[(int)fp[1].x()][(int)fp[1].y()] + r[(int)fp[2].x()][(int)fp[2].y()]);
+                Vector3 weight = GetWeight(p, fp);
+                Color c = weight.x * r[(int)fp[0].x()][(int)fp[0].y()] +
+                          weight.y * r[(int)fp[1].x()][(int)fp[1].y()] +
+                          weight.z * r[(int)fp[2].x()][(int)fp[2].y()];
                 tgt.drawPixel(i + offsetx, j + offsety, src.getPixel(i,j) + c);
             }
         }
@@ -190,7 +221,7 @@ void MVCCloneWithMesh(const Image& src, Image& tgt, int offsetx, int offsety, co
     delete[] diff;
     for(int i = 0; i < sw; i ++){
         for(int j = 0; j < sh; j ++)
-            delete[] lam[i][j];
+        delete[] lam[i][j];
         delete[] lam[i];
         delete[] r[i];
     }
